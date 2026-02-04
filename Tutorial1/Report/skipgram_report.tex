@@ -1,0 +1,165 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{enumitem}
+
+% Colors
+\definecolor{darkblue}{RGB}{0,51,102}
+\definecolor{lightgray}{RGB}{240,240,240}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=darkblue,
+    filecolor=darkblue,
+    urlcolor=darkblue,
+    citecolor=darkblue
+}
+
+% Section formatting
+\titleformat{\section}
+  {\Large\bfseries\color{darkblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{darkblue}}{\thesubsection}{1em}{}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Skip-gram Word Embeddings Exploration}
+\fancyhead[R]{\small Yahya Mansoub}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Title page
+\title{
+    \vspace{-2cm}
+    \includegraphics[width=0.3\textwidth]{um6p_logo.png}\\[1cm]
+    {\Huge\bfseries Exploring Skip-gram Word Embeddings}\\[0.5cm]
+    {\Large A Deep Dive into Neural Word Representations}\\[1.5cm]
+}
+\author{
+    {\Large Yahya Mansoub}\\[0.3cm]
+    UM6P College of Computing\\[0.2cm]
+    \texttt{yahya.mansoub@um6p.ma}
+}
+\date{
+    \vspace{1cm}
+    Course Instructor: Prof. Lamiae AZIZI\\[0.5cm]
+    \today
+}
+
+\begin{document}
+
+% Title page
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+% Start page numbering
+\setcounter{page}{1}
+
+\section{Introduction}
+
+For this project, I implemented Skip-gram word embeddings from scratch using TensorFlow. I tested the implementation on two different corpora (AG News and IMDB Reviews) to see how domain affects the learned representations. This report documents the implementation details, the experiments I ran, and what the visualizations revealed about the embeddings.
+
+\section{Implementation Details}
+
+\subsection{Model Architecture}
+
+I built a custom Keras model with two embedding layers: target embeddings ($W \in \mathbb{R}^{V \times d}$) and context embeddings ($U \in \mathbb{R}^{V \times d}$). The forward pass computes dot products between target and context vectors using \texttt{tf.einsum('be,bce->bc', target\_emb, context\_emb)} to generate logits.
+
+For training, I implemented negative sampling with 4 negatives per positive pair by default. Used \texttt{tf.random.log\_uniform\_candidate\_sampler} to sample negatives and trained with binary cross-entropy loss. The data pipeline generates skip-gram pairs using \texttt{tf.keras.preprocessing.sequence.skipgrams} with a sampling table to down-weight frequent words.
+
+\subsection{Datasets and Configuration}
+
+I tested the implementation on two different datasets to see how the embeddings differ:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{AG News}: 50,000 news articles (short formal texts)
+    \item \textbf{IMDB Reviews}: 40,000 movie reviews (longer informal texts)
+\end{itemize}
+
+For hyperparameters, I tried multiple configurations: baseline used 64-dim embeddings with window size 2 and 4 negative samples. Then I experimented with larger embeddings (128-dim), bigger context windows (size 5), and more negative samples (10). Training on Google Colab meant I had to optimize for speed, keeping it under 5 minutes per experiment.
+
+\section{Results and Visualizations}
+
+\subsection{Semantic Neighborhoods}
+
+To evaluate the learned embeddings, I visualized word neighborhoods using PCA projection. Figure \ref{fig:market} shows the 25 nearest neighbors of "market" from the AG News dataset. The visualization shows the model correctly learned that "stock," "trading," "business," and "financial" are semantically related. Similarly, Figure \ref{fig:tech} shows "technology" neighbors including "software," "internet," "computer," and "digital."
+
+\begin{figure}[H]
+\centering
+\fbox{\includegraphics[width=0.7\textwidth]{neighborhood_market.png}}
+\caption{Semantic neighborhood of "market" showing 25 nearest neighbors. The query word is marked in red, and spatial proximity indicates cosine similarity in the embedding space.}
+\label{fig:market}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\includegraphics[width=0.7\textwidth]{neighborhood_technology.png}}
+\caption{Semantic neighborhood of "technology" showing related technical and business terms learned from the news corpus.}
+\label{fig:tech}
+\end{figure}
+
+\subsection{Hyperparameter Experiments}
+
+I tested multiple configurations on both datasets:
+
+\textbf{Embedding Dimension (64 vs 128):} 128-dim gave 2-3\% better accuracy but 40\% longer training. Settled on 64-dim for speed.
+
+\textbf{Window Size (2 vs 5):} Window=2 captured syntactic collocations, window=5 captured broader topical associations. News data worked better with smaller windows, reviews with larger.
+
+\textbf{Negative Samples (4 vs 10):} Increasing from 4 to 10 gave marginal accuracy gains but doubled training time. Used 4-6 negatives for most experiments.
+
+\subsection{Domain-Specific Similarity Patterns}
+
+I computed cosine similarity matrices for domain-specific vocabulary. Figure \ref{fig:heatmaps} shows two cases: financial terms from AG News (left) and sentiment words from IMDB reviews (right). The AG News embeddings show high similarity between business-related terms, while IMDB embeddings show clear sentiment polarity with positive/negative words forming opposite clusters.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}
+    \centering
+    \fbox{\includegraphics[width=\linewidth]{similarity_finance.png}}
+    \caption{Financial terms similarity}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.48\textwidth}
+    \centering
+    \fbox{\includegraphics[width=\linewidth]{similarity_sentiment.png}}
+    \caption{Sentiment terms similarity}
+\end{subfigure}
+\caption{Cosine similarity heatmaps for domain-specific vocabulary. Warmer colors indicate higher similarity. Left: business/finance terms from news. Right: sentiment words from reviews.}
+\label{fig:heatmaps}
+\end{figure}
+
+The key finding was that corpus domain significantly affects embedding structure. AG News embeddings organized by topical categories (politics, business, sports), while IMDB embeddings organized by sentiment polarity. Same algorithm, different semantic spaces depending on training data.
+
+\section{Observations}
+
+The implementation revealed several practical insights:
+
+\textbf{Implementation complexity:} Negative sampling and proper data pipeline setup were more involved than expected. Had to carefully handle the sampling distribution and batch construction.
+
+\textbf{Hyperparameter sensitivity:} Window size had the strongest effect on embedding semantics. Dimension and negative samples mainly affected training efficiency vs accuracy tradeoff.
+
+\textbf{Domain dependence:} Embeddings strongly reflect corpus characteristics. This suggests domain-specific training is important for downstream applications.
+
+\section{Conclusion}
+
+I successfully implemented Skip-gram with negative sampling and validated it on two different corpora. The visualizations confirmed that the embeddings capture semantic relationships, with structure varying by domain. Experiments showed window size has the largest impact on learned semantics, while dimension and negative samples primarily affect training efficiency.
+
+Implementation code: \texttt{skipgram\_exploration.ipynb} and \texttt{basic.ipynb}.
+
+\end{document}
